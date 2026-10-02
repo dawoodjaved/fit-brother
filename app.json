@@ -1,31 +1,54 @@
 {
   "expo": {
-    "name": "Trainer-App",
-    "slug": "Trainer-App",
-    "version": "1.0.0",
+    "name": "FitBrother",
+    "slug": "fitbrother",
+    "version": "2.0.0",
     "orientation": "portrait",
-    "userInterfaceStyle": "automatic",
     "icon": "./assets/icon.png",
+    "newArchEnabled": false,
     "splash": {
       "image": "./assets/splash.png",
       "resizeMode": "contain",
-      "backgroundColor": "#ffffff"
+      "backgroundColor": "#0A1018"
     },
-    "updates": {
-      "fallbackToCacheTimeout": 0
-    },
-    "assetBundlePatterns": ["**/*"],
+
+    "assetBundlePatterns": [
+      "**/*"
+    ],
     "ios": {
-      "supportsTablet": true
+      "supportsTablet": true,
+      "bundleIdentifier": "com.fitbrother.app"
     },
     "android": {
       "adaptiveIcon": {
         "foregroundImage": "./assets/adaptive-icon.png",
-        "backgroundColor": "#FFFFFF"
-      }
+        "backgroundColor": "#0A1018"
+      },
+      "package": "com.fitbrother.app",
+      "versionCode": 2
     },
     "web": {
       "favicon": "./assets/favicon.png"
+    },
+    "plugins": [
+      "expo-font",
+      [
+        "expo-notifications",
+        {
+          "color": "#3DFFC8"
+        }
+      ],
+      "expo-asset"
+    ],
+    "extra": {
+      "firebaseApiKey": "",
+      "firebaseAuthDomain": "",
+      "firebaseProjectId": "",
+      "firebaseStorageBucket": "",
+      "firebaseMessagingSenderId": "",
+      "firebaseAppId": "",
+      "useDemoMode": true,
+      "adminNotifyEmail": "admin@fitbrother.app"
     }
   }
 }

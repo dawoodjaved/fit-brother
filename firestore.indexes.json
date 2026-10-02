@@ -1,0 +1,28 @@
+{
+  "indexes": [
+    {
+      "collectionGroup": "guidanceThreads",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "memberId", "order": "ASCENDING" },
+        { "fieldPath": "lastMessageAt", "order": "DESCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "guidanceThreads",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "trainerId", "order": "ASCENDING" },
+        { "fieldPath": "lastMessageAt", "order": "DESCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "trainers",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "status", "order": "ASCENDING" },
+        { "fieldPath": "city", "order": "ASCENDING" }
+      ]
+    }
+  ]
+}
