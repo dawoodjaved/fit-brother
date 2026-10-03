@@ -1,5 +1,4 @@
 import React, { useState } from "react";
-import { StyleSheet, View } from "react-native";
 import { NativeStackScreenProps } from "@react-navigation/native-stack";
 import { Screen } from "../../components/Screen";
 import { AppText } from "../../components/AppText";

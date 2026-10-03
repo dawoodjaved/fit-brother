@@ -1,8 +1,6 @@
 import Constants from "expo-constants";
 import { initializeApp, getApps, FirebaseApp } from "firebase/app";
-import { getAuth, Auth } from "firebase/auth";
 import { getFirestore, Firestore } from "firebase/firestore";
-import { getStorage, FirebaseStorage } from "firebase/storage";
 
 type Extra = {
   firebaseApiKey?: string;
@@ -17,7 +15,7 @@ type Extra = {
 
 const extra = (Constants.expoConfig?.extra || {}) as Extra;
 
-export const useDemoMode =
+const useDemoMode =
   extra.useDemoMode !== false ||
   !extra.firebaseApiKey ||
   extra.firebaseApiKey.length < 10;
@@ -35,18 +33,14 @@ const firebaseConfig = {
 };
 
 let app: FirebaseApp | null = null;
-let auth: Auth | null = null;
 let db: Firestore | null = null;
-let storage: FirebaseStorage | null = null;
 
-/** Spark-safe: Auth + Firestore + Storage only. No Cloud Functions. */
+/** Spark-safe: Firestore only for now (Auth/Storage not wired in app code yet). */
 export function getFirebase() {
   if (useDemoMode) {
     return {
       app: null,
-      auth: null,
       db: null,
-      storage: null,
       useDemoMode: true as const,
     };
   }
@@ -55,8 +49,6 @@ export function getFirebase() {
   } else {
     app = getApps()[0]!;
   }
-  auth = getAuth(app);
   db = getFirestore(app);
-  storage = getStorage(app);
-  return { app, auth, db, storage, useDemoMode: false as const };
+  return { app, db, useDemoMode: false as const };
 }

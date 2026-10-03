@@ -4,7 +4,6 @@ import Animated, {
   Easing,
   FadeInDown,
   FadeInUp,
-  FadeIn,
   Layout,
   useAnimatedStyle,
   useSharedValue,
@@ -45,14 +44,6 @@ export function FadeInHeader({ children, style }: Omit<MotionProps, "index">) {
 export function PopIn({ children, style, delay = 0 }: Omit<MotionProps, "index">) {
   return (
     <Animated.View entering={ZoomIn.delay(delay).springify().damping(14)} style={style}>
-      {children}
-    </Animated.View>
-  );
-}
-
-export function FadeScreen({ children, style }: Omit<MotionProps, "index">) {
-  return (
-    <Animated.View entering={FadeIn.duration(280)} style={[{ flex: 1 }, style]}>
       {children}
     </Animated.View>
   );
