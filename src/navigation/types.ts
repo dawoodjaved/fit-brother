@@ -1,5 +1,3 @@
-import type { FitnessLevel } from "../types";
-
 export type AuthStackParamList = {
   Onboarding: undefined;
   GetStarted: undefined;
@@ -33,5 +31,3 @@ export type RootStackParamList = {
   GuidanceChat: { threadId: string };
   GuidanceSessionBook: { trainerId: string; threadId?: string };
 };
-
-export type { FitnessLevel };

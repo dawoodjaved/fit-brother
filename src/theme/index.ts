@@ -3,7 +3,6 @@ export const colors = {
   bg: "#0A1018",
   bgElevated: "#101821",
   surface: "#141E2A",
-  surfaceHover: "#1B2836",
   border: "#243244",
   /**
    * Form-scan mint — not Volt lime, not Peloton red, not Hevy blue.
@@ -27,8 +26,6 @@ export const colors = {
   muscleSynergist: "#6EC8FF",
   muscleStabilizer: "#FFB020",
   muscleAntagonist: "#94A3B8",
-  white: "#FFFFFF",
-  black: "#000000",
 };
 
 export const spacing = {
@@ -54,5 +51,3 @@ export const typography = {
   bodyMedium: "DMSans_500Medium",
   bodyBold: "DMSans_700Bold",
 };
-
-export const theme = { colors, spacing, radii, typography };

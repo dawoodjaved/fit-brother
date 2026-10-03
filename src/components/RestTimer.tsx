@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from "react";
-import { View, StyleSheet, Pressable } from "react-native";
+import { View, StyleSheet } from "react-native";
 import { colors, radii, spacing, typography } from "../theme";
 import { AppText } from "./AppText";
 import { Button } from "./Button";
