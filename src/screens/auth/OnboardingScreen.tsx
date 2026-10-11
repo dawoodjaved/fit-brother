@@ -1,11 +1,11 @@
 import React, { useRef, useState } from "react";
 import {
-  Dimensions,
   FlatList,
   ImageBackground,
   StyleSheet,
   View,
   ViewToken,
+  useWindowDimensions,
 } from "react-native";
 import { NativeStackScreenProps } from "@react-navigation/native-stack";
 import { LinearGradient } from "expo-linear-gradient";
@@ -15,8 +15,6 @@ import { BrandLogo } from "../../components/BrandLogo";
 import { colors, spacing } from "../../theme";
 import type { AuthStackParamList } from "../../navigation/types";
 import { APP_MOTTO } from "../../brand";
-
-const { width, height } = Dimensions.get("window");
 
 const SLIDES = [
   {
@@ -42,6 +40,7 @@ const SLIDES = [
 type Props = NativeStackScreenProps<AuthStackParamList, "Onboarding">;
 
 export function OnboardingScreen({ navigation }: Props) {
+  const { width, height } = useWindowDimensions();
   const [index, setIndex] = useState(0);
   const onViewableItemsChanged = useRef(
     ({ viewableItems }: { viewableItems: ViewToken[] }) => {
@@ -60,12 +59,17 @@ export function OnboardingScreen({ navigation }: Props) {
         keyExtractor={(i) => i.key}
         onViewableItemsChanged={onViewableItemsChanged}
         viewabilityConfig={{ viewAreaCoveragePercentThreshold: 60 }}
+        getItemLayout={(_, i) => ({
+          length: width,
+          offset: width * i,
+          index: i,
+        })}
         renderItem={({ item }) => (
-          <View style={styles.slide} pointerEvents="none">
+          <View style={{ width, height }} pointerEvents="none">
             <ImageBackground source={item.image} style={StyleSheet.absoluteFill} resizeMode="cover">
               <LinearGradient
                 colors={["transparent", "rgba(14,17,22,0.55)", colors.bg]}
-                style={styles.grad}
+                style={[styles.grad, { minHeight: height, paddingBottom: Math.max(120, height * 0.18) }]}
               >
                 <BrandLogo variant="mark" />
                 <AppText variant="caption" color={colors.accent} style={{ marginTop: 8 }}>
@@ -80,7 +84,7 @@ export function OnboardingScreen({ navigation }: Props) {
           </View>
         )}
       />
-      <View style={styles.footer}>
+      <View style={[styles.footer, { paddingBottom: Math.max(spacing.lg, height * 0.03) }]}>
         <View style={styles.dots} pointerEvents="none">
           {SLIDES.map((s, i) => (
             <View key={s.key} style={[styles.dot, i === index && styles.dotOn]} />
@@ -94,13 +98,10 @@ export function OnboardingScreen({ navigation }: Props) {
 
 const styles = StyleSheet.create({
   root: { flex: 1, backgroundColor: colors.bg },
-  slide: { width, height },
   grad: {
     flex: 1,
     justifyContent: "flex-end",
     padding: spacing.lg,
-    paddingBottom: 140,
-    minHeight: height,
   },
   title: { marginTop: spacing.sm, maxWidth: 320 },
   body: { marginTop: spacing.sm, maxWidth: 320, color: colors.textSecondary },

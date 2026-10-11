@@ -29,15 +29,20 @@ export function GlobalExerciseSearch({
   const results = useMemo(() => {
     const query = q.trim().toLowerCase();
     if (query.length < 1) return [];
+    const tokens = query.split(/\s+/).filter(Boolean);
     return exercises
       .filter((e) => {
         const hay = `${e.name} ${e.pattern} ${e.muscles.primary.join(" ")}`.toLowerCase();
-        return hay.includes(query);
+        const words = hay.split(/[^a-z0-9]+/).filter(Boolean);
+        return tokens.every(
+          (t) => words.some((w) => w.startsWith(t) || (t.length >= 4 && w.includes(t)))
+        );
       })
       .slice(0, 12);
   }, [q]);
 
-  const showList = focused && q.trim().length > 0;
+  // Keep results visible while typing (don't require focus — web blur was hiding the list)
+  const showList = q.trim().length > 0;
 
   return (
     <View style={styles.wrap}>

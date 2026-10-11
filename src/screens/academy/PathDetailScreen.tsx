@@ -5,10 +5,10 @@ import { Screen } from "../../components/Screen";
 import { AppText } from "../../components/AppText";
 import { Card } from "../../components/Card";
 import { Button } from "../../components/Button";
-import { FadeInHeader, FadeInItem } from "../../components/motion";
+import { FadeInHeader } from "../../components/motion";
 import { PatternIcon } from "../../components/icons/PatternIcon";
 import { CapacityRing, ProgressBar } from "../../components/charts/VisualMeter";
-import { learningPaths, exercises } from "../../data/seed";
+import { exerciseById, learningPaths } from "../../data/seed";
 import { useAppStore } from "../../store/appStore";
 import { colors, spacing } from "../../theme";
 import type { RootStackParamList } from "../../navigation/types";
@@ -78,12 +78,12 @@ export function PathDetailScreen({ route, navigation }: Props) {
       </FadeInHeader>
 
       {path.exerciseIds.map((id, idx) => {
-        const ex = exercises.find((e) => e.id === id);
+        const ex = exerciseById[id];
         const complete = done.includes(id);
         const locked = idx >= unlockedCount && !complete;
         return (
-          <FadeInItem key={id} index={idx}>
             <Pressable
+              key={id}
               disabled={locked}
               onPress={() =>
                 navigation.navigate("ExerciseDetail", {
@@ -133,7 +133,6 @@ export function PathDetailScreen({ route, navigation }: Props) {
                 </View>
               </Card>
             </Pressable>
-          </FadeInItem>
         );
       })}
     </Screen>

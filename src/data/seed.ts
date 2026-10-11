@@ -524,8 +524,17 @@ const coreExercises: Exercise[] = [
 ];
 
 
-/** Flagship curated lessons + full learning catalog (~220 more). */
+/** Flagship curated lessons + full learning catalog (~480 more). */
 export const exercises: Exercise[] = [...coreExercises, ...catalogExercises];
+
+/** O(1) lookup — prefer this over exercises.find in loops. */
+export const exerciseById: Record<string, Exercise> = Object.fromEntries(
+  exercises.map((e) => [e.id, e])
+);
+
+export function getExercise(id: string): Exercise | undefined {
+  return exerciseById[id];
+}
 
 export const learningPaths: LearningPath[] = [
   {

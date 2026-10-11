@@ -8,7 +8,7 @@ import { AppText } from "../../components/AppText";
 import { Card } from "../../components/Card";
 import { Chip } from "../../components/Inputs";
 import { CueOfDayCard, FormStreakBanner } from "../../components/engagement/CueOfDay";
-import { FadeInHeader, FadeInItem, Pulse } from "../../components/motion";
+import { FadeInHeader, Pulse } from "../../components/motion";
 import { CapacityRing } from "../../components/charts/VisualMeter";
 import { useAppStore } from "../../store/appStore";
 import { colors, spacing } from "../../theme";
@@ -29,7 +29,10 @@ export function HomeClassesScreen() {
     [classes]
   );
 
-  const filtered = classes.filter((c) => !category || c.category === category);
+  const filtered = useMemo(
+    () => classes.filter((c) => !category || c.category === category),
+    [classes, category]
+  );
 
   const cueExercise = useMemo(() => {
     const cue = cueOfTheDay();
@@ -79,12 +82,12 @@ export function HomeClassesScreen() {
         ))}
       </View>
 
-      {filtered.map((klass, i) => {
+      {filtered.map((klass) => {
         const spots = Math.max(0, klass.capacity - klass.bookedCount);
         const fill = klass.bookedCount / Math.max(1, klass.capacity);
         return (
-          <FadeInItem key={klass.id} index={i}>
             <Pressable
+              key={klass.id}
               onPress={() => navigation.navigate("ClassDetail", { classId: klass.id })}
             >
               <Card style={styles.card}>
@@ -122,7 +125,6 @@ export function HomeClassesScreen() {
                 </View>
               </Card>
             </Pressable>
-          </FadeInItem>
         );
       })}
 

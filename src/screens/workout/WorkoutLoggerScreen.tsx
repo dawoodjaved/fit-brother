@@ -1,5 +1,5 @@
-import React, { useMemo, useState } from "react";
-import { Pressable, View } from "react-native";
+import React, { useEffect, useMemo, useState } from "react";
+import { View } from "react-native";
 import { NativeStackScreenProps } from "@react-navigation/native-stack";
 import * as Haptics from "expo-haptics";
 import { Screen } from "../../components/Screen";
@@ -11,7 +11,7 @@ import { RestTimer } from "../../components/RestTimer";
 import { PopIn, FadeInHeader } from "../../components/motion";
 import { PatternIcon } from "../../components/icons/PatternIcon";
 import { ProgressBar } from "../../components/charts/VisualMeter";
-import { exercises } from "../../data/seed";
+import { exerciseById } from "../../data/seed";
 import {
   getSwapCandidates,
   overloadHint,
@@ -26,20 +26,41 @@ import { notify } from "../../utils/notify";
 
 type Props = NativeStackScreenProps<RootStackParamList, "WorkoutLogger">;
 
+function defaultSets(from?: WorkoutSet[]): WorkoutSet[] {
+  if (from?.length) {
+    return from.map((s) => ({ ...s, completed: false }));
+  }
+  return [
+    { reps: 8, weight: 20, completed: false },
+    { reps: 8, weight: 20, completed: false },
+    { reps: 8, weight: 20, completed: false },
+  ];
+}
+
 export function WorkoutLoggerScreen({ route, navigation }: Props) {
-  const sessionIds = route.params.sessionIds?.length
-    ? route.params.sessionIds
-    : [route.params.exerciseId];
+  const editingLogId = route.params.logId;
+  const isEditing = Boolean(editingLogId);
+  const sessionIds = isEditing
+    ? [route.params.exerciseId]
+    : route.params.sessionIds?.length
+      ? route.params.sessionIds
+      : [route.params.exerciseId];
   const [sessionIndex, setSessionIndex] = useState(0);
   const exerciseId = sessionIds[sessionIndex] || route.params.exerciseId;
-  const exercise = exercises.find((e) => e.id === exerciseId);
+  const exercise = exerciseById[exerciseId];
   const user = useAppStore((s) => s.user);
   const logWorkout = useAppStore((s) => s.logWorkout);
+  const updateWorkout = useAppStore((s) => s.updateWorkout);
   const logs = useAppStore((s) => s.workoutLogs);
 
+  const editingLog = useMemo(
+    () => (editingLogId ? logs.find((l) => l.id === editingLogId) : undefined),
+    [editingLogId, logs]
+  );
+
   const lastLog = useMemo(
-    () => logs.find((l) => l.exerciseId === exerciseId),
-    [logs, exerciseId]
+    () => logs.find((l) => l.exerciseId === exerciseId && l.id !== editingLogId),
+    [logs, exerciseId, editingLogId]
   );
   const lastTop = lastLog?.sets?.reduce(
     (a, b) => (b.weight * b.reps >= a.weight * a.reps ? b : a),
@@ -47,21 +68,29 @@ export function WorkoutLoggerScreen({ route, navigation }: Props) {
   );
 
   const [sets, setSets] = useState<WorkoutSet[]>(() => {
-    if (lastTop) {
-      return [
-        { reps: lastTop.reps, weight: lastTop.weight, completed: false },
-        { reps: lastTop.reps, weight: lastTop.weight, completed: false },
-        { reps: lastTop.reps, weight: lastTop.weight, completed: false },
-      ];
+    if (editingLog?.sets?.length) {
+      return editingLog.sets.map((s) => ({ ...s }));
     }
-    return [
-      { reps: 8, weight: 20, completed: false },
-      { reps: 8, weight: 20, completed: false },
-      { reps: 8, weight: 20, completed: false },
-    ];
+    if (lastTop) {
+      return defaultSets([
+        { reps: lastTop.reps, weight: lastTop.weight, completed: false },
+      ]);
+    }
+    return defaultSets();
   });
+  const [logDate, setLogDate] = useState(
+    () => editingLog?.date || format(new Date(), "yyyy-MM-dd")
+  );
   const [showRest, setShowRest] = useState(false);
   const [savedCompare, setSavedCompare] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (editingLog) {
+      setSets(editingLog.sets.map((s) => ({ ...s })));
+      setLogDate(editingLog.date);
+      navigation.setOptions({ title: "Edit workout" });
+    }
+  }, [editingLog, navigation]);
 
   const rest = useMemo(
     () => restGuidance(user?.goals?.[0], user?.level || "beginner"),
@@ -70,16 +99,18 @@ export function WorkoutLoggerScreen({ route, navigation }: Props) {
 
   const swaps = useMemo(
     () =>
-      getSwapCandidates(
-        exerciseId,
-        user?.equipmentPreferences || ["bodyweight"],
-        user?.limitations || []
-      ).slice(0, 3),
-    [exerciseId, user]
+      isEditing
+        ? []
+        : getSwapCandidates(
+            exerciseId,
+            user?.equipmentPreferences || ["bodyweight"],
+            user?.limitations || []
+          ).slice(0, 3),
+    [exerciseId, user, isEditing]
   );
 
   const limitedSwapHint = useMemo(() => {
-    if (!user?.limitations?.length) return null;
+    if (isEditing || !user?.limitations?.length) return null;
     if (user.limitations.includes("shoulder_sensitive") && exercise?.pattern === "push") {
       return swaps[0];
     }
@@ -90,12 +121,21 @@ export function WorkoutLoggerScreen({ route, navigation }: Props) {
       return swaps[0];
     }
     return null;
-  }, [user, exercise, swaps]);
+  }, [user, exercise, swaps, isEditing]);
 
   if (!exercise) {
     return (
       <Screen>
         <AppText>Missing exercise</AppText>
+      </Screen>
+    );
+  }
+
+  if (isEditing && !editingLog) {
+    return (
+      <Screen>
+        <AppText>This workout was deleted.</AppText>
+        <Button title="Back to history" onPress={() => navigation.goBack()} />
       </Screen>
     );
   }
@@ -117,6 +157,17 @@ export function WorkoutLoggerScreen({ route, navigation }: Props) {
     setShowRest(false);
   };
 
+  const loadSetsForExercise = (id: string) => {
+    const prev = logs.find((l) => l.exerciseId === id);
+    const top = prev?.sets?.[0];
+    setSets(
+      top
+        ? defaultSets([{ reps: top.reps, weight: top.weight, completed: false }])
+        : defaultSets()
+    );
+    setSavedCompare(null);
+  };
+
   return (
     <Screen scroll>
       <FadeInHeader>
@@ -124,8 +175,8 @@ export function WorkoutLoggerScreen({ route, navigation }: Props) {
           <PatternIcon pattern={exercise.pattern} size={32} active />
           <View style={{ flex: 1 }}>
             <AppText variant="label">
-              LOG
-              {sessionIds.length > 1
+              {isEditing ? "EDIT LOG" : "LOG"}
+              {!isEditing && sessionIds.length > 1
                 ? ` · ${sessionIndex + 1}/${sessionIds.length}`
                 : ""}
             </AppText>
@@ -134,7 +185,7 @@ export function WorkoutLoggerScreen({ route, navigation }: Props) {
             </AppText>
           </View>
         </View>
-        {sessionIds.length > 1 ? (
+        {!isEditing && sessionIds.length > 1 ? (
           <ProgressBar
             progress={(sessionIndex + 1) / sessionIds.length}
             height={5}
@@ -142,10 +193,21 @@ export function WorkoutLoggerScreen({ route, navigation }: Props) {
         ) : null}
       </FadeInHeader>
 
-      {sessionIds.length > 1 ? (
+      {isEditing ? (
+        <Card style={{ marginBottom: spacing.md }}>
+          <TextField
+            label="Date (yyyy-MM-dd)"
+            value={logDate}
+            onChangeText={setLogDate}
+            autoCapitalize="none"
+          />
+        </Card>
+      ) : null}
+
+      {!isEditing && sessionIds.length > 1 ? (
         <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 8, marginBottom: spacing.md }}>
           {sessionIds.map((id, i) => {
-            const ex = exercises.find((e) => e.id === id);
+            const ex = exerciseById[id];
             return (
               <Button
                 key={id}
@@ -154,22 +216,7 @@ export function WorkoutLoggerScreen({ route, navigation }: Props) {
                 style={{ marginBottom: 0 }}
                 onPress={() => {
                   setSessionIndex(i);
-                  const prev = logs.find((l) => l.exerciseId === id);
-                  const top = prev?.sets?.[0];
-                  setSets(
-                    top
-                      ? [
-                          { reps: top.reps, weight: top.weight, completed: false },
-                          { reps: top.reps, weight: top.weight, completed: false },
-                          { reps: top.reps, weight: top.weight, completed: false },
-                        ]
-                      : [
-                          { reps: 8, weight: 20, completed: false },
-                          { reps: 8, weight: 20, completed: false },
-                          { reps: 8, weight: 20, completed: false },
-                        ]
-                  );
-                  setSavedCompare(null);
+                  loadSetsForExercise(id);
                 }}
               />
             );
@@ -177,7 +224,7 @@ export function WorkoutLoggerScreen({ route, navigation }: Props) {
         </View>
       ) : null}
 
-      {lastTop ? (
+      {!isEditing && lastTop ? (
         <Card style={{ marginBottom: spacing.md, borderColor: colors.accentDim }}>
           <AppText variant="label">COMPARE LAST SET</AppText>
           <AppText style={{ marginTop: 6 }}>
@@ -273,7 +320,7 @@ export function WorkoutLoggerScreen({ route, navigation }: Props) {
         <PopIn>
           <Card style={{ marginTop: spacing.md, borderColor: colors.accent }}>
             <AppText variant="subtitle" color={colors.accent}>
-              Next step locked in
+              {isEditing ? "Workout updated" : "Next step locked in"}
             </AppText>
             <AppText style={{ marginTop: 6 }}>{savedCompare}</AppText>
           </Card>
@@ -282,17 +329,37 @@ export function WorkoutLoggerScreen({ route, navigation }: Props) {
 
       <Button
         title={
-          sessionIndex < sessionIds.length - 1
-            ? "Save & next exercise"
-            : "Save workout"
+          isEditing
+            ? "Save changes"
+            : sessionIndex < sessionIds.length - 1
+              ? "Save & next exercise"
+              : "Save workout"
         }
         style={{ marginTop: spacing.lg }}
         onPress={() => {
+          const date =
+            isEditing && /^\d{4}-\d{2}-\d{2}$/.test(logDate.trim())
+              ? logDate.trim()
+              : format(new Date(), "yyyy-MM-dd");
+
+          if (isEditing && editingLogId) {
+            updateWorkout(editingLogId, { sets, date });
+            const top = sets.reduce((a, b) =>
+              b.weight * b.reps >= a.weight * a.reps ? b : a
+            );
+            const msg = `Updated ${exercise.name}: ${top.weight}kg × ${top.reps}`;
+            setSavedCompare(msg);
+            Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
+            notify("Updated", msg);
+            navigation.goBack();
+            return;
+          }
+
           logWorkout({
             exerciseId: exercise.id,
             exerciseName: exercise.name,
             sets,
-            date: format(new Date(), "yyyy-MM-dd"),
+            date,
           });
           const top = sets.reduce((a, b) =>
             b.weight * b.reps >= a.weight * a.reps ? b : a
@@ -306,21 +373,7 @@ export function WorkoutLoggerScreen({ route, navigation }: Props) {
           if (sessionIndex < sessionIds.length - 1) {
             const nextId = sessionIds[sessionIndex + 1]!;
             setSessionIndex(sessionIndex + 1);
-            const prev = logs.find((l) => l.exerciseId === nextId);
-            const topPrev = prev?.sets?.[0];
-            setSets(
-              topPrev
-                ? [
-                    { reps: topPrev.reps, weight: topPrev.weight, completed: false },
-                    { reps: topPrev.reps, weight: topPrev.weight, completed: false },
-                    { reps: topPrev.reps, weight: topPrev.weight, completed: false },
-                  ]
-                : [
-                    { reps: 8, weight: 20, completed: false },
-                    { reps: 8, weight: 20, completed: false },
-                    { reps: 8, weight: 20, completed: false },
-                  ]
-            );
+            loadSetsForExercise(nextId);
             setShowRest(false);
           } else {
             navigation.goBack();

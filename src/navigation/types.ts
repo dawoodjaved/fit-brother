@@ -20,7 +20,8 @@ export type RootStackParamList = {
   ClassDetail: { classId: string };
   ExerciseDetail: { exerciseId: string; pathId?: string };
   PathDetail: { pathId: string };
-  WorkoutLogger: { exerciseId: string; sessionIds?: string[] };
+  WorkoutLogger: { exerciseId: string; sessionIds?: string[]; logId?: string };
+  WorkoutHistory: undefined;
   AdminDashboard: undefined;
   GymHub: undefined;
   RegionTrain: { region: string };

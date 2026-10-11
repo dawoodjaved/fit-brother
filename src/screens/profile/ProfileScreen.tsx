@@ -153,6 +153,13 @@ export function ProfileScreen() {
         <MuscleHeatmap scores={heatmap} />
       </View>
 
+      <Button
+        title={`Workout history (${logs.length})`}
+        variant="secondary"
+        style={{ marginTop: spacing.lg }}
+        onPress={() => navigation.navigate("WorkoutHistory")}
+      />
+
       <AppText variant="label" style={{ marginTop: spacing.lg }}>
         PERSONAL RECORDS
       </AppText>

@@ -7,6 +7,7 @@ import {
   DEMO_PASSWORD,
   demoAdmin,
   demoMember,
+  exerciseById,
   exercises,
   learningPaths,
   seedClasses,
@@ -62,6 +63,11 @@ interface AppState {
   markLessonComplete: (exerciseId: string, pathId?: string) => void;
   toggleFavorite: (exerciseId: string) => void;
   logWorkout: (entry: Omit<WorkoutLogEntry, "id" | "synced">) => void;
+  updateWorkout: (
+    id: string,
+    patch: Partial<Pick<WorkoutLogEntry, "sets" | "date" | "notes" | "exerciseId" | "exerciseName">>
+  ) => void;
+  deleteWorkout: (id: string) => void;
   flushOfflineQueue: () => void;
   getCheckInCode: () => string;
   /** Bump form streak / lastFormDate */
@@ -73,6 +79,29 @@ interface AppState {
   submitFormFeel: (bookingId: string, feel: FormFeel) => void;
   markBookingAttended: (bookingId: string) => void;
   setActivePath: (pathId: string) => void;
+}
+
+function recomputePersonalRecords(logs: WorkoutLogEntry[]): PersonalRecord[] {
+  const bestByExercise = new Map<string, PersonalRecord>();
+  for (const log of logs) {
+    const top = log.sets.reduce(
+      (best, s) => (s.weight * s.reps > best.weight * best.reps ? s : best),
+      { reps: 0, weight: 0, completed: true } as WorkoutSet
+    );
+    const score = top.weight * top.reps;
+    if (score <= 0) continue;
+    const existing = bestByExercise.get(log.exerciseId);
+    if (!existing || existing.weight * existing.reps < score) {
+      bestByExercise.set(log.exerciseId, {
+        exerciseId: log.exerciseId,
+        exerciseName: log.exerciseName,
+        weight: top.weight,
+        reps: top.reps,
+        date: log.date,
+      });
+    }
+  }
+  return Array.from(bestByExercise.values());
 }
 
 function blankEngagement(): Pick<
@@ -405,41 +434,42 @@ export const useAppStore = create<AppState>()(
         const id = `log-${Date.now()}`;
         const full: WorkoutLogEntry = { ...entry, id, synced: true };
         const logs = [full, ...get().workoutLogs];
-
-        const bestSet = entry.sets.reduce(
-          (best, s) => (s.weight * s.reps > best.weight * best.reps ? s : best),
-          { reps: 0, weight: 0, completed: true } as WorkoutSet
-        );
-        let personalRecords = [...get().personalRecords];
-        const existing = personalRecords.find((p) => p.exerciseId === entry.exerciseId);
-        const score = bestSet.weight * bestSet.reps;
-        if (!existing || existing.weight * existing.reps < score) {
-          const pr: PersonalRecord = {
-            exerciseId: entry.exerciseId,
-            exerciseName: entry.exerciseName,
-            weight: bestSet.weight,
-            reps: bestSet.reps,
-            date: entry.date,
-          };
-          personalRecords = [
-            pr,
-            ...personalRecords.filter((p) => p.exerciseId !== entry.exerciseId),
-          ];
-        }
-
         const user = get().user;
         set({
           workoutLogs: logs,
-          personalRecords,
+          personalRecords: recomputePersonalRecords(logs),
           user: user ? applyFormStreak(user) : user,
+        });
+      },
+
+      updateWorkout: (id, patch) => {
+        const logs = get().workoutLogs.map((l) =>
+          l.id === id ? { ...l, ...patch } : l
+        );
+        set({
+          workoutLogs: logs,
+          personalRecords: recomputePersonalRecords(logs),
+        });
+      },
+
+      deleteWorkout: (id) => {
+        const logs = get().workoutLogs.filter((l) => l.id !== id);
+        set({
+          workoutLogs: logs,
+          personalRecords: recomputePersonalRecords(logs),
         });
       },
 
       flushOfflineQueue: () => {
         const queue = get().offlineQueue;
         if (!queue.length) return;
+        const logs = [
+          ...queue.map((q) => ({ ...q, synced: true })),
+          ...get().workoutLogs,
+        ];
         set({
-          workoutLogs: [...queue.map((q) => ({ ...q, synced: true })), ...get().workoutLogs],
+          workoutLogs: logs,
+          personalRecords: recomputePersonalRecords(logs),
           offlineQueue: [],
         });
       },
@@ -549,7 +579,7 @@ export const useAppStore = create<AppState>()(
 );
 
 export function getExerciseById(id: string) {
-  return exercises.find((e) => e.id === id);
+  return exerciseById[id];
 }
 
 export function getSwapCandidates(exerciseId: string, equipment: Equipment[], limitations: Limitation[]) {

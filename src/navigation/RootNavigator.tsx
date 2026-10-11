@@ -20,6 +20,7 @@ import { AcademyHomeScreen } from "../screens/academy/AcademyHomeScreen";
 import { ExerciseDetailScreen } from "../screens/academy/ExerciseDetailScreen";
 import { PathDetailScreen } from "../screens/academy/PathDetailScreen";
 import { WorkoutLoggerScreen } from "../screens/workout/WorkoutLoggerScreen";
+import { WorkoutHistoryScreen } from "../screens/workout/WorkoutHistoryScreen";
 import { TrainHubScreen } from "../screens/workout/TrainHubScreen";
 import { RegionTrainScreen } from "../screens/workout/RegionTrainScreen";
 import { ProfileScreen } from "../screens/profile/ProfileScreen";
@@ -42,6 +43,8 @@ function MainTabs() {
     <Tab.Navigator
       screenOptions={({ route }) => ({
         headerShown: false,
+        lazy: true,
+        freezeOnBlur: true,
         tabBarStyle: {
           backgroundColor: colors.bgElevated,
           borderTopColor: colors.border,
@@ -130,6 +133,11 @@ export function RootNavigator() {
         name="WorkoutLogger"
         component={WorkoutLoggerScreen}
         options={{ title: "Log workout" }}
+      />
+      <RootStack.Screen
+        name="WorkoutHistory"
+        component={WorkoutHistoryScreen}
+        options={{ title: "Workout history" }}
       />
       <RootStack.Screen
         name="RegionTrain"

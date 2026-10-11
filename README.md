@@ -7,7 +7,7 @@ Android-first gym app — book classes, learn form with GIF guides, log workouts
 ## Features
 
 - Class booking with waitlists and QR check-in
-- Exercise Academy with 235+ GIF form guides
+- Exercise Academy with 495+ GIF form guides
 - Train hub, Body Map, and workout logger
 - Pakistan trainers — chat, voice notes, paid sessions
 - Admin tools for bookings and trainer approval

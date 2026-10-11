@@ -1,20 +1,13 @@
-import React, { useEffect, useState } from "react";
+import React, { memo, useEffect, useMemo, useState } from "react";
 import {
-  Image,
   StyleSheet,
   View,
-  Dimensions,
   Pressable,
   ActivityIndicator,
+  AppState,
+  type AppStateStatus,
 } from "react-native";
-import Animated, {
-  Easing,
-  FadeIn,
-  useAnimatedStyle,
-  useSharedValue,
-  withRepeat,
-  withTiming,
-} from "react-native-reanimated";
+import { Image } from "expo-image";
 import { LinearGradient } from "expo-linear-gradient";
 import { AppText } from "./AppText";
 import {
@@ -25,8 +18,7 @@ import {
 } from "../data/exerciseGifs";
 import type { MuscleRoles } from "../types";
 import { colors, radii, spacing, typography } from "../theme";
-
-const W = Dimensions.get("window").width - spacing.lg * 2;
+import { useLayout } from "../utils/layout";
 
 type Props = {
   gifKey: GifKey;
@@ -42,7 +34,7 @@ type Props = {
  * Looping form GIF + synced phase callouts + muscle-hit legend.
  * Prefers exercise-specific CDN GIF; falls back to bundled pattern GIF.
  */
-export function GifFormGuide({
+export const GifFormGuide = memo(function GifFormGuide({
   gifKey,
   gifUrl,
   exerciseName,
@@ -50,6 +42,7 @@ export function GifFormGuide({
   cues,
   restartKey,
 }: Props) {
+  const { mediaWidth, gifHeight } = useLayout();
   const phases = GIF_FORM_PHASES[gifKey] || GIF_FORM_PHASES.squat;
   const loopMs = GIF_LOOP_MS[gifKey] || 3000;
   const phaseMs = Math.max(900, Math.floor(loopMs / Math.max(phases.length, 1)));
@@ -58,7 +51,7 @@ export function GifFormGuide({
   const [gifNonce, setGifNonce] = useState(0);
   const [useCdn, setUseCdn] = useState(!!gifUrl);
   const [loading, setLoading] = useState(true);
-  const pulse = useSharedValue(1);
+  const [active, setActive] = useState(true);
 
   useEffect(() => {
     setPhaseIndex(0);
@@ -68,30 +61,28 @@ export function GifFormGuide({
   }, [gifKey, gifUrl, restartKey]);
 
   useEffect(() => {
+    const onChange = (state: AppStateStatus) => setActive(state === "active");
+    const sub = AppState.addEventListener("change", onChange);
+    return () => sub.remove();
+  }, []);
+
+  useEffect(() => {
+    if (!active) return;
     const id = setInterval(() => {
       setPhaseIndex((i) => (i + 1) % phases.length);
     }, phaseMs);
     return () => clearInterval(id);
-  }, [phaseMs, phases.length, gifKey]);
-
-  useEffect(() => {
-    pulse.value = withRepeat(
-      withTiming(1.08, { duration: 700, easing: Easing.inOut(Easing.quad) }),
-      -1,
-      true
-    );
-  }, [pulse]);
-
-  const primaryPulse = useAnimatedStyle(() => ({
-    transform: [{ scale: pulse.value }],
-  }));
+  }, [phaseMs, phases.length, gifKey, active]);
 
   const phase = phases[phaseIndex]!;
-  const source = useCdn && gifUrl ? { uri: gifUrl } : GIF_ASSETS[gifKey];
+  const source = useMemo(
+    () => (useCdn && gifUrl ? { uri: gifUrl } : GIF_ASSETS[gifKey]),
+    [useCdn, gifUrl, gifKey]
+  );
 
   return (
-    <Animated.View entering={FadeIn.duration(400)} style={styles.wrap}>
-      <View style={styles.player}>
+    <View style={styles.wrap}>
+      <View style={[styles.player, { width: mediaWidth, height: gifHeight }]}>
         {loading ? (
           <View style={styles.loader}>
             <ActivityIndicator color={colors.accent} size="large" />
@@ -101,7 +92,9 @@ export function GifFormGuide({
           key={`${gifKey}-${restartKey ?? ""}-${gifNonce}-${useCdn ? "cdn" : "local"}`}
           source={source}
           style={styles.gif}
-          resizeMode="contain"
+          contentFit="contain"
+          cachePolicy="memory-disk"
+          recyclingKey={`${gifKey}-${useCdn ? "cdn" : "local"}`}
           onLoad={() => setLoading(false)}
           onError={() => {
             if (useCdn) {
@@ -153,14 +146,11 @@ export function GifFormGuide({
         <AppText variant="label">MUSCLES THIS HIT</AppText>
         <View style={styles.chipRow}>
           {muscles.primary.map((m) => (
-            <Animated.View
-              key={`p-${m}`}
-              style={[styles.chip, styles.chipPrimary, primaryPulse]}
-            >
+            <View key={`p-${m}`} style={[styles.chip, styles.chipPrimary]}>
               <AppText variant="caption" color={colors.accentInk} style={styles.chipText}>
                 Primary · {m}
               </AppText>
-            </Animated.View>
+            </View>
           ))}
         </View>
         {muscles.synergist.length ? (
@@ -197,15 +187,13 @@ export function GifFormGuide({
           ))}
         </View>
       ) : null}
-    </Animated.View>
+    </View>
   );
-}
+});
 
 const styles = StyleSheet.create({
   wrap: { marginTop: spacing.sm },
   player: {
-    width: W,
-    height: Math.min(W, 380),
     alignSelf: "center",
     backgroundColor: colors.bg,
     borderRadius: radii.lg,
@@ -215,7 +203,7 @@ const styles = StyleSheet.create({
   },
   gif: { width: "100%", height: "100%" },
   loader: {
-    ...StyleSheet.absoluteFillObject,
+    ...StyleSheet.absoluteFill,
     alignItems: "center",
     justifyContent: "center",
     zIndex: 2,

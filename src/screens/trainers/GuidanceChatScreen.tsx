@@ -9,7 +9,14 @@ import {
 } from "react-native";
 import { NativeStackScreenProps } from "@react-navigation/native-stack";
 import { format, parseISO } from "date-fns";
-import { Audio } from "expo-av";
+import {
+  createAudioPlayer,
+  RecordingPresets,
+  requestRecordingPermissionsAsync,
+  setAudioModeAsync,
+  useAudioRecorder,
+  type AudioPlayer,
+} from "expo-audio";
 import { Screen } from "../../components/Screen";
 import { AppText } from "../../components/AppText";
 import { Button } from "../../components/Button";
@@ -40,8 +47,9 @@ export function GuidanceChatScreen({ route, navigation }: Props) {
   const openWhatsApp = useGuidanceStore((s) => s.openWhatsAppVoice);
 
   const [text, setText] = useState("");
-  const [recording, setRecording] = useState<Audio.Recording | null>(null);
-  const soundRef = useRef<Audio.Sound | null>(null);
+  const [isRecording, setIsRecording] = useState(false);
+  const playerRef = useRef<AudioPlayer | null>(null);
+  const recorder = useAudioRecorder(RecordingPresets.HIGH_QUALITY);
 
   const messages = remoteMsgs ?? localMsgs;
   const trainer = trainers.find((t) => t.id === thread?.trainerId);
@@ -53,7 +61,12 @@ export function GuidanceChatScreen({ route, navigation }: Props) {
     const unsub = subscribeMessagesRemote(threadId, setRemoteMsgs);
     return () => {
       unsub?.();
-      soundRef.current?.unloadAsync().catch(() => {});
+      try {
+        playerRef.current?.remove();
+      } catch {
+        // ignore
+      }
+      playerRef.current = null;
     };
   }, [threadId]);
 
@@ -78,29 +91,33 @@ export function GuidanceChatScreen({ route, navigation }: Props) {
       return;
     }
     try {
-      await Audio.requestPermissionsAsync();
-      await Audio.setAudioModeAsync({
-        allowsRecordingIOS: true,
-        playsInSilentModeIOS: true,
+      const { granted } = await requestRecordingPermissionsAsync();
+      if (!granted) {
+        notify("Mic permission needed");
+        return;
+      }
+      await setAudioModeAsync({
+        allowsRecording: true,
+        playsInSilentMode: true,
       });
-      const { recording: rec } = await Audio.Recording.createAsync(
-        Audio.RecordingOptionsPresets.HIGH_QUALITY
-      );
-      setRecording(rec);
+      await recorder.prepareToRecordAsync();
+      recorder.record();
+      setIsRecording(true);
     } catch {
+      setIsRecording(false);
       notify("Mic unavailable");
     }
   };
 
   const stopRec = async () => {
-    if (!recording) return;
+    if (!isRecording) return;
     try {
-      await recording.stopAndUnloadAsync();
-      const uri = recording.getURI();
-      setRecording(null);
+      await recorder.stop();
+      setIsRecording(false);
+      const uri = recorder.uri;
       if (uri) sendVoice(threadId, user.uid, uri);
     } catch {
-      setRecording(null);
+      setIsRecording(false);
       notify("Could not save voice note");
     }
   };
@@ -108,10 +125,14 @@ export function GuidanceChatScreen({ route, navigation }: Props) {
   const playVoice = async (uri?: string) => {
     if (!uri) return;
     try {
-      await soundRef.current?.unloadAsync();
-      const { sound } = await Audio.Sound.createAsync({ uri });
-      soundRef.current = sound;
-      await sound.playAsync();
+      try {
+        playerRef.current?.remove();
+      } catch {
+        // ignore
+      }
+      const player = createAudioPlayer({ uri });
+      playerRef.current = player;
+      player.play();
     } catch {
       notify("Playback failed");
     }
@@ -260,10 +281,10 @@ export function GuidanceChatScreen({ route, navigation }: Props) {
           <Pressable
             onPressIn={startRec}
             onPressOut={stopRec}
-            style={[styles.mic, recording && { backgroundColor: colors.danger }]}
+            style={[styles.mic, isRecording && { backgroundColor: colors.danger }]}
           >
             <AppText color={colors.accentInk} style={{ fontSize: 12 }}>
-              {recording ? "…" : "MIC"}
+              {isRecording ? "…" : "MIC"}
             </AppText>
           </Pressable>
           <Pressable onPress={onSend} style={styles.send}>
