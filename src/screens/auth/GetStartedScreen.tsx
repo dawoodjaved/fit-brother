@@ -32,9 +32,11 @@ export function GetStartedScreen({ navigation }: Props) {
           onPress={() => navigation.navigate("SignUp")}
           style={{ marginTop: spacing.sm }}
         />
-        <AppText variant="caption" style={{ marginTop: spacing.lg, textAlign: "center" }}>
-          Demo · Member {DEMO_MEMBER_EMAIL} / Admin {DEMO_ADMIN_EMAIL} · password {DEMO_PASSWORD}
-        </AppText>
+        {__DEV__ ? (
+          <AppText variant="caption" style={{ marginTop: spacing.lg, textAlign: "center" }}>
+            Dev demo · {DEMO_MEMBER_EMAIL} / {DEMO_ADMIN_EMAIL} · {DEMO_PASSWORD}
+          </AppText>
+        ) : null}
       </View>
     </Screen>
   );

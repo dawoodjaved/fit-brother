@@ -17,8 +17,8 @@ type Props = NativeStackScreenProps<AuthStackParamList, "SignIn">;
 export function SignInScreen({ navigation }: Props) {
   const login = useAppStore((s) => s.login);
   const authError = useAppStore((s) => s.authError);
-  const [email, setEmail] = useState(DEMO_MEMBER_EMAIL);
-  const [password, setPassword] = useState(DEMO_PASSWORD);
+  const [email, setEmail] = useState(__DEV__ ? DEMO_MEMBER_EMAIL : "");
+  const [password, setPassword] = useState(__DEV__ ? DEMO_PASSWORD : "");
   const [loading, setLoading] = useState(false);
 
   const onSubmit = async () => {

@@ -162,7 +162,7 @@ export const useAppStore = create<AppState>()(
       login: async (email, password) => {
         const e = email.trim().toLowerCase();
         if (password !== DEMO_PASSWORD) {
-          set({ authError: "Invalid credentials. Use demo1234 for demo accounts." });
+          set({ authError: "Invalid email or password." });
           return false;
         }
         if (e === DEMO_ADMIN_EMAIL) {
@@ -173,12 +173,13 @@ export const useAppStore = create<AppState>()(
           set({ user: { ...demoMember }, authError: null });
           return true;
         }
-        // Allow any email with demo password as a new member session
+        // Demo: any email + demo password → member only (never admin)
         set({
           user: {
             ...demoMember,
             uid: `user-${Date.now()}`,
             email: e,
+            role: "member",
             firstName: e.split("@")[0] || "Athlete",
             lastName: "User",
             initials: initials(e.split("@")[0] || "A", "U"),
@@ -199,6 +200,7 @@ export const useAppStore = create<AppState>()(
           set({ authError: "Fill all fields. Password must be 6+ characters." });
           return false;
         }
+        // Never assign admin from client email — privilege escalation vector
         set({
           user: {
             uid: `user-${Date.now()}`,
@@ -206,7 +208,7 @@ export const useAppStore = create<AppState>()(
             firstName,
             lastName,
             phoneNumber,
-            role: email.trim().toLowerCase() === DEMO_ADMIN_EMAIL ? "admin" : "member",
+            role: "member",
             level: "beginner",
             goals: [],
             equipmentPreferences: ["bodyweight"],
@@ -255,7 +257,8 @@ export const useAppStore = create<AppState>()(
       updateProfile: (patch) => {
         const user = get().user;
         if (!user) return;
-        set({ user: { ...user, ...patch } });
+        const { role: _r, uid: _u, email: _e, createdAt: _c, ...safe } = patch;
+        set({ user: { ...user, ...safe } });
       },
 
       bookClass: (classId) => {
@@ -303,6 +306,9 @@ export const useAppStore = create<AppState>()(
         const { bookings, classes, user } = get();
         const booking = bookings.find((b) => b.id === bookingId);
         if (!booking || !user) return { ok: false, message: "Booking not found" };
+        if (booking.userId !== user.uid && user.role !== "admin") {
+          return { ok: false, message: "Not your booking" };
+        }
         if (booking.status === "cancelled") return { ok: false, message: "Already cancelled" };
 
         const klass = classes.find((c) => c.id === booking.classId);
@@ -372,6 +378,7 @@ export const useAppStore = create<AppState>()(
       },
 
       createClass: (klass) => {
+        if (get().user?.role !== "admin") return;
         const id = `class-${Date.now()}`;
         const created = recomputeStatus({
           ...klass,
@@ -384,6 +391,7 @@ export const useAppStore = create<AppState>()(
       },
 
       updateClass: (id, patch) => {
+        if (get().user?.role !== "admin") return;
         set({
           classes: get().classes.map((c) =>
             c.id === id ? recomputeStatus({ ...c, ...patch }) : c
@@ -392,6 +400,7 @@ export const useAppStore = create<AppState>()(
       },
 
       deleteClass: (id) => {
+        if (get().user?.role !== "admin") return;
         set({ classes: get().classes.filter((c) => c.id !== id) });
       },
 
@@ -533,8 +542,13 @@ export const useAppStore = create<AppState>()(
       },
 
       markBookingAttended: (bookingId) => {
+        const { user, bookings } = get();
+        if (!user) return;
+        const booking = bookings.find((b) => b.id === bookingId);
+        if (!booking) return;
+        if (booking.userId !== user.uid && user.role !== "admin") return;
         set({
-          bookings: get().bookings.map((b) =>
+          bookings: bookings.map((b) =>
             b.id === bookingId ? { ...b, status: "attended" } : b
           ),
         });

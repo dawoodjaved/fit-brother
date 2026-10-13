@@ -29,7 +29,8 @@ const demoFlag = (env.EXPO_PUBLIC_USE_DEMO_MODE ?? "true").toLowerCase();
 
 /**
  * Expo reads app.config.js over app.json.
- * Secrets stay in gitignored .env; committed app.json keeps empty placeholders.
+ * EXPO_PUBLIC_* Firebase values embed in the client — treat as public config.
+ * Never put Admin SDK / Stripe secret / DB URLs here. .env is gitignored.
  */
 module.exports = ({ config }) => ({
   ...config,

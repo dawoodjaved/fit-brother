@@ -27,7 +27,7 @@ npm install --legacy-peer-deps
 npx expo start --android
 ```
 
-### Demo logins
+### Demo logins (local / `__DEV__` only)
 
 Password for both: `demo1234`
 
@@ -37,3 +37,9 @@ Password for both: `demo1234`
 | Admin  | admin@fitbrother.app  |
 
 Firebase setup (optional): see [FIREBASE.md](./FIREBASE.md).
+
+## Security (secrets)
+
+- `.env` is gitignored. `EXPO_PUBLIC_FIREBASE_*` is **public client config**, not a server secret.
+- If any key was ever hardcoded in git history, **rotate it** in Google Cloud and lock down API key restrictions / App Check.
+- Deploy rules: `firebase deploy --only firestore:rules,storage --project fitbrother`
