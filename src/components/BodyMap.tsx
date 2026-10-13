@@ -1,6 +1,5 @@
-import React, { useMemo, useState } from "react";
+import React, { memo, useMemo, useState } from "react";
 import {
-  Dimensions,
   ImageBackground,
   Pressable,
   StyleSheet,
@@ -10,6 +9,7 @@ import Svg, { Circle, G, Line, Rect, Text as SvgText } from "react-native-svg";
 import Animated, { FadeIn } from "react-native-reanimated";
 import { colors, radii, spacing, typography } from "../theme";
 import { AppText } from "./AppText";
+import { useLayout } from "../utils/layout";
 
 type BodyView = "front" | "back";
 
@@ -301,14 +301,11 @@ const CHAR_W = 3.4;
 /** Extra space so leader never enters the pill */
 const LINE_GAP = 4;
 
-const W = Math.min(Dimensions.get("window").width - spacing.lg * 2 - 8, 420);
-const H = Math.round(W * (BOX_H / BOX_W));
-
 function labelWidth(name: string) {
   return Math.min(92, Math.max(46, name.length * CHAR_W + LABEL_PAD_X * 2));
 }
 
-export function BodyMap({
+export const BodyMap = memo(function BodyMap({
   selected,
   onSelect,
   onTrainRegion,
@@ -318,6 +315,9 @@ export function BodyMap({
   /** Optional CTA when a region is focused — e.g. Train mini-path */
   onTrainRegion?: (region: BodyRegion) => void;
 }) {
+  const { bodyMapWidth } = useLayout();
+  const W = bodyMapWidth;
+  const H = Math.round(W * (BOX_H / BOX_W));
   const [view, setView] = useState<BodyView>("front");
   const [focusId, setFocusId] = useState<string | null>(null);
 
@@ -368,12 +368,12 @@ export function BodyMap({
         ))}
       </View>
 
-      <View style={styles.stage}>
+      <View style={[styles.stage, { width: W, height: H }]}>
         <ImageBackground
           key={view}
           source={FIGURE[view]}
-          style={styles.figure}
-          imageStyle={styles.figureImg}
+          style={[styles.figure, { width: W, height: H }]}
+          imageStyle={{ width: W, height: H }}
           resizeMode="contain"
         />
         {/* Lines first; opaque pills + text last so labels never sit under strokes */}
@@ -538,7 +538,7 @@ export function BodyMap({
       </View>
     </View>
   );
-}
+});
 
 const styles = StyleSheet.create({
   wrap: {
@@ -562,8 +562,6 @@ const styles = StyleSheet.create({
   toggleOn: { backgroundColor: colors.accent, borderColor: colors.accent },
   toggleText: { fontFamily: typography.bodyBold },
   stage: {
-    width: W,
-    height: H,
     alignSelf: "center",
     backgroundColor: colors.bg,
     borderRadius: radii.md,
@@ -572,16 +570,10 @@ const styles = StyleSheet.create({
     borderColor: colors.border,
   },
   figure: {
-    ...StyleSheet.absoluteFillObject,
-    width: W,
-    height: H,
-  },
-  figureImg: {
-    width: W,
-    height: H,
+    ...StyleSheet.absoluteFill,
   },
   overlay: {
-    ...StyleSheet.absoluteFillObject,
+    ...StyleSheet.absoluteFill,
     zIndex: 2,
   },
   info: {

@@ -7,6 +7,7 @@ import {
   DEMO_PASSWORD,
   demoAdmin,
   demoMember,
+  exerciseById,
   exercises,
   learningPaths,
   seedClasses,
@@ -62,6 +63,11 @@ interface AppState {
   markLessonComplete: (exerciseId: string, pathId?: string) => void;
   toggleFavorite: (exerciseId: string) => void;
   logWorkout: (entry: Omit<WorkoutLogEntry, "id" | "synced">) => void;
+  updateWorkout: (
+    id: string,
+    patch: Partial<Pick<WorkoutLogEntry, "sets" | "date" | "notes" | "exerciseId" | "exerciseName">>
+  ) => void;
+  deleteWorkout: (id: string) => void;
   flushOfflineQueue: () => void;
   getCheckInCode: () => string;
   /** Bump form streak / lastFormDate */
@@ -73,6 +79,29 @@ interface AppState {
   submitFormFeel: (bookingId: string, feel: FormFeel) => void;
   markBookingAttended: (bookingId: string) => void;
   setActivePath: (pathId: string) => void;
+}
+
+function recomputePersonalRecords(logs: WorkoutLogEntry[]): PersonalRecord[] {
+  const bestByExercise = new Map<string, PersonalRecord>();
+  for (const log of logs) {
+    const top = log.sets.reduce(
+      (best, s) => (s.weight * s.reps > best.weight * best.reps ? s : best),
+      { reps: 0, weight: 0, completed: true } as WorkoutSet
+    );
+    const score = top.weight * top.reps;
+    if (score <= 0) continue;
+    const existing = bestByExercise.get(log.exerciseId);
+    if (!existing || existing.weight * existing.reps < score) {
+      bestByExercise.set(log.exerciseId, {
+        exerciseId: log.exerciseId,
+        exerciseName: log.exerciseName,
+        weight: top.weight,
+        reps: top.reps,
+        date: log.date,
+      });
+    }
+  }
+  return Array.from(bestByExercise.values());
 }
 
 function blankEngagement(): Pick<
@@ -133,7 +162,7 @@ export const useAppStore = create<AppState>()(
       login: async (email, password) => {
         const e = email.trim().toLowerCase();
         if (password !== DEMO_PASSWORD) {
-          set({ authError: "Invalid credentials. Use demo1234 for demo accounts." });
+          set({ authError: "Invalid email or password." });
           return false;
         }
         if (e === DEMO_ADMIN_EMAIL) {
@@ -144,12 +173,13 @@ export const useAppStore = create<AppState>()(
           set({ user: { ...demoMember }, authError: null });
           return true;
         }
-        // Allow any email with demo password as a new member session
+        // Demo: any email + demo password → member only (never admin)
         set({
           user: {
             ...demoMember,
             uid: `user-${Date.now()}`,
             email: e,
+            role: "member",
             firstName: e.split("@")[0] || "Athlete",
             lastName: "User",
             initials: initials(e.split("@")[0] || "A", "U"),
@@ -170,6 +200,7 @@ export const useAppStore = create<AppState>()(
           set({ authError: "Fill all fields. Password must be 6+ characters." });
           return false;
         }
+        // Never assign admin from client email — privilege escalation vector
         set({
           user: {
             uid: `user-${Date.now()}`,
@@ -177,7 +208,7 @@ export const useAppStore = create<AppState>()(
             firstName,
             lastName,
             phoneNumber,
-            role: email.trim().toLowerCase() === DEMO_ADMIN_EMAIL ? "admin" : "member",
+            role: "member",
             level: "beginner",
             goals: [],
             equipmentPreferences: ["bodyweight"],
@@ -226,7 +257,8 @@ export const useAppStore = create<AppState>()(
       updateProfile: (patch) => {
         const user = get().user;
         if (!user) return;
-        set({ user: { ...user, ...patch } });
+        const { role: _r, uid: _u, email: _e, createdAt: _c, ...safe } = patch;
+        set({ user: { ...user, ...safe } });
       },
 
       bookClass: (classId) => {
@@ -274,6 +306,9 @@ export const useAppStore = create<AppState>()(
         const { bookings, classes, user } = get();
         const booking = bookings.find((b) => b.id === bookingId);
         if (!booking || !user) return { ok: false, message: "Booking not found" };
+        if (booking.userId !== user.uid && user.role !== "admin") {
+          return { ok: false, message: "Not your booking" };
+        }
         if (booking.status === "cancelled") return { ok: false, message: "Already cancelled" };
 
         const klass = classes.find((c) => c.id === booking.classId);
@@ -343,6 +378,7 @@ export const useAppStore = create<AppState>()(
       },
 
       createClass: (klass) => {
+        if (get().user?.role !== "admin") return;
         const id = `class-${Date.now()}`;
         const created = recomputeStatus({
           ...klass,
@@ -355,6 +391,7 @@ export const useAppStore = create<AppState>()(
       },
 
       updateClass: (id, patch) => {
+        if (get().user?.role !== "admin") return;
         set({
           classes: get().classes.map((c) =>
             c.id === id ? recomputeStatus({ ...c, ...patch }) : c
@@ -363,6 +400,7 @@ export const useAppStore = create<AppState>()(
       },
 
       deleteClass: (id) => {
+        if (get().user?.role !== "admin") return;
         set({ classes: get().classes.filter((c) => c.id !== id) });
       },
 
@@ -405,41 +443,42 @@ export const useAppStore = create<AppState>()(
         const id = `log-${Date.now()}`;
         const full: WorkoutLogEntry = { ...entry, id, synced: true };
         const logs = [full, ...get().workoutLogs];
-
-        const bestSet = entry.sets.reduce(
-          (best, s) => (s.weight * s.reps > best.weight * best.reps ? s : best),
-          { reps: 0, weight: 0, completed: true } as WorkoutSet
-        );
-        let personalRecords = [...get().personalRecords];
-        const existing = personalRecords.find((p) => p.exerciseId === entry.exerciseId);
-        const score = bestSet.weight * bestSet.reps;
-        if (!existing || existing.weight * existing.reps < score) {
-          const pr: PersonalRecord = {
-            exerciseId: entry.exerciseId,
-            exerciseName: entry.exerciseName,
-            weight: bestSet.weight,
-            reps: bestSet.reps,
-            date: entry.date,
-          };
-          personalRecords = [
-            pr,
-            ...personalRecords.filter((p) => p.exerciseId !== entry.exerciseId),
-          ];
-        }
-
         const user = get().user;
         set({
           workoutLogs: logs,
-          personalRecords,
+          personalRecords: recomputePersonalRecords(logs),
           user: user ? applyFormStreak(user) : user,
+        });
+      },
+
+      updateWorkout: (id, patch) => {
+        const logs = get().workoutLogs.map((l) =>
+          l.id === id ? { ...l, ...patch } : l
+        );
+        set({
+          workoutLogs: logs,
+          personalRecords: recomputePersonalRecords(logs),
+        });
+      },
+
+      deleteWorkout: (id) => {
+        const logs = get().workoutLogs.filter((l) => l.id !== id);
+        set({
+          workoutLogs: logs,
+          personalRecords: recomputePersonalRecords(logs),
         });
       },
 
       flushOfflineQueue: () => {
         const queue = get().offlineQueue;
         if (!queue.length) return;
+        const logs = [
+          ...queue.map((q) => ({ ...q, synced: true })),
+          ...get().workoutLogs,
+        ];
         set({
-          workoutLogs: [...queue.map((q) => ({ ...q, synced: true })), ...get().workoutLogs],
+          workoutLogs: logs,
+          personalRecords: recomputePersonalRecords(logs),
           offlineQueue: [],
         });
       },
@@ -503,8 +542,13 @@ export const useAppStore = create<AppState>()(
       },
 
       markBookingAttended: (bookingId) => {
+        const { user, bookings } = get();
+        if (!user) return;
+        const booking = bookings.find((b) => b.id === bookingId);
+        if (!booking) return;
+        if (booking.userId !== user.uid && user.role !== "admin") return;
         set({
-          bookings: get().bookings.map((b) =>
+          bookings: bookings.map((b) =>
             b.id === bookingId ? { ...b, status: "attended" } : b
           ),
         });
@@ -549,7 +593,7 @@ export const useAppStore = create<AppState>()(
 );
 
 export function getExerciseById(id: string) {
-  return exercises.find((e) => e.id === id);
+  return exerciseById[id];
 }
 
 export function getSwapCandidates(exerciseId: string, equipment: Equipment[], limitations: Limitation[]) {

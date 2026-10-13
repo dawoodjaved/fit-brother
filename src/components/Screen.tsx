@@ -1,4 +1,4 @@
-import React from "react";
+import React, { memo } from "react";
 import { SafeAreaView } from "react-native-safe-area-context";
 import {
   ScrollView,
@@ -7,10 +7,10 @@ import {
   ViewStyle,
   StatusBar,
 } from "react-native";
-import Animated, { FadeIn } from "react-native-reanimated";
 import { colors, spacing } from "../theme";
+import { useLayout } from "../utils/layout";
 
-export function Screen({
+export const Screen = memo(function Screen({
   children,
   scroll,
   style,
@@ -21,22 +21,24 @@ export function Screen({
   style?: ViewStyle;
   contentStyle?: ViewStyle;
 }) {
-  const inner = (
-    <Animated.View entering={FadeIn.duration(280)} style={{ flexGrow: 1 }}>
-      {children}
-    </Animated.View>
-  );
+  const { contentPad, isCompact } = useLayout();
+  const padStyle = {
+    paddingHorizontal: contentPad,
+    paddingTop: isCompact ? spacing.sm : spacing.md,
+    paddingBottom: spacing.xxl,
+  };
 
   const body = scroll ? (
     <ScrollView
-      contentContainerStyle={[styles.content, contentStyle]}
+      contentContainerStyle={[padStyle, contentStyle]}
       showsVerticalScrollIndicator={false}
       keyboardShouldPersistTaps="handled"
+      removeClippedSubviews
     >
-      {inner}
+      {children}
     </ScrollView>
   ) : (
-    <View style={[styles.content, contentStyle, { flex: 1 }]}>{inner}</View>
+    <View style={[padStyle, contentStyle, { flex: 1 }]}>{children}</View>
   );
 
   return (
@@ -45,9 +47,8 @@ export function Screen({
       {body}
     </SafeAreaView>
   );
-}
+});
 
 const styles = StyleSheet.create({
   safe: { flex: 1, backgroundColor: colors.bg },
-  content: { padding: spacing.lg, paddingBottom: spacing.xxl },
 });

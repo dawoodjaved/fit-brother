@@ -10,7 +10,7 @@ import { Card } from "../../components/Card";
 import { BodyMap } from "../../components/BodyMap";
 import { FadeInHeader, FadeInItem, PopIn } from "../../components/motion";
 import { FormStreakBanner } from "../../components/engagement/CueOfDay";
-import { exercises, learningPaths } from "../../data/seed";
+import { exerciseById, exercises, learningPaths } from "../../data/seed";
 import { useAppStore } from "../../store/appStore";
 import { colors, spacing } from "../../theme";
 import type { RootStackParamList } from "../../navigation/types";
@@ -31,17 +31,27 @@ export function TrainHubScreen() {
 
   const favorites = user?.favorites || [];
   const sessionIds = user?.sessionExerciseIds || [];
+  const completedLessons = user?.completedLessons;
+  const activePathId = user?.activePathId || "path-foundations";
   const byMuscle = useMemo(() => groupFavoritesByMuscle(favorites), [favorites]);
-  const sessionExercises = exercises.filter((e) => sessionIds.includes(e.id));
-
-  const activePath = learningPaths.find(
-    (p) => p.id === (user?.activePathId || "path-foundations")
+  const sessionExercises = useMemo(
+    () => sessionIds.map((id) => exerciseById[id]).filter(Boolean),
+    [sessionIds]
   );
-  const pathSuggestions = (activePath?.exerciseIds || [])
-    .filter((id) => !user?.completedLessons?.includes(id))
-    .slice(0, 4)
-    .map((id) => exercises.find((e) => e.id === id))
-    .filter(Boolean);
+
+  const activePath = useMemo(
+    () => learningPaths.find((p) => p.id === activePathId),
+    [activePathId]
+  );
+  const pathSuggestions = useMemo(
+    () =>
+      (activePath?.exerciseIds || [])
+        .filter((id) => !completedLessons?.includes(id))
+        .slice(0, 4)
+        .map((id) => exerciseById[id])
+        .filter(Boolean),
+    [activePath, completedLessons]
+  );
 
   const startSession = () => {
     if (sessionIds.length < 1) {
@@ -78,6 +88,13 @@ export function TrainHubScreen() {
       <FormStreakBanner
         streak={user?.formStreak || 0}
         understoodCount={user?.formUnderstood?.length || 0}
+      />
+
+      <Button
+        title="Workout history"
+        variant="secondary"
+        style={{ marginBottom: spacing.md }}
+        onPress={() => navigation.navigate("WorkoutHistory")}
       />
 
       <PopIn>

@@ -31,6 +31,19 @@ import type {
   TrainerSpecialty,
 } from "../types";
 import { GUIDANCE_PACKAGES } from "../types";
+import { useAppStore } from "./appStore";
+
+function currentUser() {
+  return useAppStore.getState().user;
+}
+
+function isAdminUser() {
+  return currentUser()?.role === "admin";
+}
+
+function isThreadParticipant(thread: GuidanceThread, uid: string) {
+  return thread.memberId === uid || thread.trainerId === uid;
+}
 
 function id(prefix: string) {
   return `${prefix}-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
@@ -161,6 +174,7 @@ export const useGuidanceStore = create<GuidanceState>()(
       },
 
       approveApplication: async (applicationId) => {
+        if (!isAdminUser()) return false;
         const app = get().applications.find((a) => a.id === applicationId);
         if (!app || app.status !== "pending") return false;
         const trainer: TrainerProfile = {
@@ -200,6 +214,7 @@ export const useGuidanceStore = create<GuidanceState>()(
       },
 
       rejectApplication: async (applicationId) => {
+        if (!isAdminUser()) return false;
         set({
           applications: get().applications.map((a) =>
             a.id === applicationId ? { ...a, status: "rejected" } : a
@@ -210,6 +225,10 @@ export const useGuidanceStore = create<GuidanceState>()(
       },
 
       getOrCreateThread: ({ memberId, memberName, trainer }) => {
+        const user = currentUser();
+        if (!user || (user.uid !== memberId && user.role !== "admin")) {
+          return "";
+        }
         const existing = get().threads.find(
           (t) =>
             t.memberId === memberId &&
@@ -252,12 +271,15 @@ export const useGuidanceStore = create<GuidanceState>()(
       sendTextMessage: (threadId, senderId, text) => {
         const trimmed = text.trim();
         if (!trimmed) return;
+        const user = currentUser();
         const thread = get().threads.find((t) => t.id === threadId);
-        if (!thread || thread.status === "blocked") return;
+        if (!user || !thread || thread.status === "blocked") return;
+        if (!isThreadParticipant(thread, user.uid) && user.role !== "admin") return;
+        void senderId;
         const msg: GuidanceMessage = {
           id: id("gmsg"),
           threadId,
-          senderId,
+          senderId: user.uid,
           type: "text",
           text: trimmed,
           createdAt: new Date().toISOString(),
@@ -282,12 +304,15 @@ export const useGuidanceStore = create<GuidanceState>()(
       },
 
       sendVoiceMessage: (threadId, senderId, voiceUri) => {
+        const user = currentUser();
         const thread = get().threads.find((t) => t.id === threadId);
-        if (!thread || thread.status === "blocked") return;
+        if (!user || !thread || thread.status === "blocked") return;
+        if (!isThreadParticipant(thread, user.uid) && user.role !== "admin") return;
+        void senderId;
         const msg: GuidanceMessage = {
           id: id("gmsg"),
           threadId,
-          senderId,
+          senderId: user.uid,
           type: "voice",
           text: "Voice note",
           voiceUri,
@@ -332,10 +357,15 @@ export const useGuidanceStore = create<GuidanceState>()(
       },
 
       blockThread: (threadId, byUserId) => {
+        const user = currentUser();
+        const thread = get().threads.find((t) => t.id === threadId);
+        if (!user || !thread) return;
+        if (!isThreadParticipant(thread, user.uid) && user.role !== "admin") return;
+        void byUserId;
         set({
           threads: get().threads.map((t) =>
             t.id === threadId
-              ? { ...t, status: "blocked", blockedBy: byUserId }
+              ? { ...t, status: "blocked", blockedBy: user.uid }
               : t
           ),
         });
@@ -343,10 +373,13 @@ export const useGuidanceStore = create<GuidanceState>()(
       },
 
       reportThread: (threadId, reporterId, reason) => {
+        const user = currentUser();
+        if (!user) return;
+        void reporterId;
         const report = {
           id: id("rep"),
           threadId,
-          reporterId,
+          reporterId: user.uid,
           reason,
           createdAt: new Date().toISOString(),
         };
@@ -358,6 +391,8 @@ export const useGuidanceStore = create<GuidanceState>()(
       },
 
       bookSession: ({ threadId, memberId, trainerId, packageId, scheduledAt }) => {
+        const user = currentUser();
+        if (!user || (user.uid !== memberId && user.role !== "admin")) return null;
         const trainer = get().trainers.find((t) => t.id === trainerId);
         if (!trainer) return null;
         const pkg = GUIDANCE_PACKAGES.find((p) => p.id === packageId);
@@ -390,8 +425,10 @@ export const useGuidanceStore = create<GuidanceState>()(
       },
 
       markSessionPaid: (sessionId) => {
+        const user = currentUser();
         const session = get().sessions.find((s) => s.id === sessionId);
-        if (!session) return;
+        if (!user || !session) return;
+        if (session.memberId !== user.uid && user.role !== "admin") return;
         set({
           sessions: get().sessions.map((s) =>
             s.id === sessionId ? { ...s, paymentStatus: "marked_paid" } : s
@@ -405,8 +442,10 @@ export const useGuidanceStore = create<GuidanceState>()(
       },
 
       confirmSessionPayment: (sessionId) => {
+        const user = currentUser();
         const session = get().sessions.find((s) => s.id === sessionId);
-        if (!session) return;
+        if (!user || !session) return;
+        if (user.role !== "admin" && user.uid !== session.trainerId) return;
         set({
           sessions: get().sessions.map((s) =>
             s.id === sessionId ? { ...s, paymentStatus: "confirmed" } : s
@@ -420,11 +459,13 @@ export const useGuidanceStore = create<GuidanceState>()(
       },
 
       rateTrainer: ({ sessionId, trainerId, memberId, stars, comment }) => {
+        const user = currentUser();
+        if (!user || user.uid !== memberId) return;
         const rating: GuidanceRating = {
           id: id("grat"),
           sessionId,
           trainerId,
-          memberId,
+          memberId: user.uid,
           stars: Math.max(1, Math.min(5, stars)),
           comment,
           createdAt: new Date().toISOString(),

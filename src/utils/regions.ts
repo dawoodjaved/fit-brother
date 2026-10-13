@@ -1,5 +1,5 @@
 import type { Exercise } from "../types";
-import { exercises } from "../data/seed";
+import { exerciseById, exercises } from "../data/seed";
 import { muscleFolder } from "./engagement";
 
 const REGION_KEYS: Record<string, string[]> = {
@@ -39,7 +39,7 @@ export function miniPathForRegion(region: string): Exercise[] {
 export function groupFavoritesByMuscle(favIds: string[]): Record<string, Exercise[]> {
   const map: Record<string, Exercise[]> = {};
   favIds.forEach((id) => {
-    const ex = exercises.find((e) => e.id === id);
+    const ex = exerciseById[id];
     if (!ex) return;
     const folder = muscleFolder(ex.muscles.primary);
     if (!map[folder]) map[folder] = [];

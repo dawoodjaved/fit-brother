@@ -1,5 +1,6 @@
 import React, { useState } from "react";
 import { View } from "react-native";
+import { useNavigation } from "@react-navigation/native";
 import { Screen } from "../../components/Screen";
 import { AppText } from "../../components/AppText";
 import { Card } from "../../components/Card";
@@ -12,6 +13,8 @@ import type { FitnessLevel } from "../../types";
 import { notify } from "../../utils/notify";
 
 export function AdminDashboardScreen() {
+  const navigation = useNavigation();
+  const user = useAppStore((s) => s.user);
   const classes = useAppStore((s) => s.classes);
   const bookings = useAppStore((s) => s.bookings);
   const createClass = useAppStore((s) => s.createClass);
@@ -26,6 +29,18 @@ export function AdminDashboardScreen() {
   const [trainer, setTrainer] = useState("Ayesha Khan");
   const [time, setTime] = useState("10:00");
   const [capacity, setCapacity] = useState("12");
+
+  if (user?.role !== "admin") {
+    return (
+      <Screen>
+        <AppText variant="title">Access denied</AppText>
+        <AppText style={{ marginVertical: spacing.md }} color={colors.textSecondary}>
+          Admin role required.
+        </AppText>
+        <Button title="Go back" onPress={() => navigation.goBack()} />
+      </Screen>
+    );
+  }
 
   const today = new Date().toISOString().slice(0, 10);
   const todays = classes.filter((c) => c.date === today);

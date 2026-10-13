@@ -11,7 +11,7 @@ import { Chip } from "../../components/Inputs";
 import { FormMistakeChecklist } from "../../components/engagement/FormMistakeChecklist";
 import { FadeInHeader, PopIn } from "../../components/motion";
 import { PatternIcon } from "../../components/icons/PatternIcon";
-import { exercises, jargonGlossary } from "../../data/seed";
+import { exerciseById, jargonGlossary } from "../../data/seed";
 import { resolveGifKey, type GifKey } from "../../data/exerciseGifs";
 import {
   getSwapCandidates,
@@ -26,7 +26,7 @@ type Props = NativeStackScreenProps<RootStackParamList, "ExerciseDetail">;
 
 export function ExerciseDetailScreen({ route, navigation }: Props) {
   const { exerciseId, pathId } = route.params;
-  const exercise = exercises.find((e) => e.id === exerciseId);
+  const exercise = exerciseById[exerciseId];
   const user = useAppStore((s) => s.user);
   const markLessonComplete = useAppStore((s) => s.markLessonComplete);
   const markFormUnderstood = useAppStore((s) => s.markFormUnderstood);
@@ -175,7 +175,7 @@ export function ExerciseDetailScreen({ route, navigation }: Props) {
 
       <View style={{ flexDirection: "row", flexWrap: "wrap", marginTop: spacing.md, gap: 8 }}>
         {exercise.regressions.map((id) => {
-          const ex = exercises.find((e) => e.id === id);
+          const ex = exerciseById[id];
           return ex ? (
             <Chip
               key={id}
@@ -187,7 +187,7 @@ export function ExerciseDetailScreen({ route, navigation }: Props) {
           ) : null;
         })}
         {exercise.progressions.map((id) => {
-          const ex = exercises.find((e) => e.id === id);
+          const ex = exerciseById[id];
           return ex ? (
             <Chip
               key={id}

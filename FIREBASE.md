@@ -3,7 +3,11 @@
 Project: **`fitbrother`** (Spark free tier)  
 Android package: **`com.fitbrother.app`**
 
-Secrets live in a gitignored `.env`. `app.config.js` maps them into `expo.extra`. Do not put real keys in `app.json` or commit `.env`.
+Public Firebase Web config lives in a gitignored `.env`. `app.config.js` maps it into `expo.extra`. Do not commit `.env`. Do not put Admin SDK keys, Stripe secrets, or DB URLs in `EXPO_PUBLIC_*` (they embed in the client).
+
+Admin access in Firestore rules requires Auth custom claim `admin: true` (set via Admin SDK). Email-string admin checks are not used.
+
+**Rotate** any Firebase API keys that were ever hardcoded in git history (legacy `ttr-project-974ca` config). Restrict keys in Google Cloud Console + enable App Check.
 
 ## What we set up via Firebase CLI
 

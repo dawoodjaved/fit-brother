@@ -1,40 +1,36 @@
-import React from "react";
-import { StyleSheet, ViewStyle } from "react-native";
-import Animated, { FadeInDown, Layout } from "react-native-reanimated";
+import React, { memo } from "react";
+import { StyleSheet, View, ViewStyle } from "react-native";
+import Animated, { FadeInDown } from "react-native-reanimated";
 import { colors, radii, spacing } from "../theme";
 
-export function Card({
+export const Card = memo(function Card({
   children,
   style,
   index = 0,
-  animate = true,
+  animate = false,
 }: {
   children: React.ReactNode;
   style?: ViewStyle;
-  /** Stagger index for list entrance */
+  /** Stagger index for list entrance (only when animate) */
   index?: number;
+  /** Off by default — list scroll stays smooth on Android */
   animate?: boolean;
 }) {
   if (!animate) {
-    return (
-      <Animated.View style={[styles.card, style]} layout={Layout.springify()}>
-        {children}
-      </Animated.View>
-    );
+    return <View style={[styles.card, style]}>{children}</View>;
   }
   return (
     <Animated.View
-      entering={FadeInDown.delay(Math.min(index, 12) * 45)
-        .duration(380)
+      entering={FadeInDown.delay(Math.min(index, 8) * 40)
+        .duration(320)
         .springify()
         .damping(18)}
-      layout={Layout.springify().damping(16)}
       style={[styles.card, style]}
     >
       {children}
     </Animated.View>
   );
-}
+});
 
 const styles = StyleSheet.create({
   card: {

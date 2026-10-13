@@ -1,5 +1,6 @@
+import "react-native-gesture-handler";
 import React, { useCallback, useEffect, useState } from "react";
-import { ActivityIndicator, Image, Platform, View } from "react-native";
+import { ActivityIndicator, Image, InteractionManager, View } from "react-native";
 import { StatusBar } from "expo-status-bar";
 import { NavigationContainer, DarkTheme } from "@react-navigation/native";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
@@ -14,20 +15,12 @@ import {
   DMSans_500Medium,
   DMSans_700Bold,
 } from "@expo-google-fonts/dm-sans";
-import * as Notifications from "expo-notifications";
 import { AuthNavigator, RootNavigator } from "./src/navigation/RootNavigator";
 import { useAppStore } from "./src/store/appStore";
 import { colors } from "./src/theme";
 import { getFirebase } from "./src/services/firebase";
 import { APP_LOGO } from "./src/brand";
-
-Notifications.setNotificationHandler({
-  handleNotification: async () => ({
-    shouldShowAlert: true,
-    shouldPlaySound: false,
-    shouldSetBadge: false,
-  }),
-});
+import { setupNotificationsSafely } from "./src/utils/pushNotifications";
 
 const navTheme = {
   ...DarkTheme,
@@ -43,6 +36,7 @@ const navTheme = {
 
 export default function App() {
   const user = useAppStore((s) => s.user);
+  const hydrated = useAppStore((s) => s.hydrated);
   const flushOfflineQueue = useAppStore((s) => s.flushOfflineQueue);
   const [ready, setReady] = useState(false);
 
@@ -55,26 +49,23 @@ export default function App() {
   });
 
   const boot = useCallback(async () => {
-    getFirebase();
-    flushOfflineQueue();
-    if (Platform.OS !== "web") {
-      try {
-        await Promise.race([
-          Notifications.requestPermissionsAsync(),
-          new Promise((resolve) => setTimeout(resolve, 1500)),
-        ]);
-      } catch {
-        // notifications optional on simulators
-      }
+    try {
+      getFirebase();
+      await setupNotificationsSafely();
+    } finally {
+      setReady(true);
+      // Defer store mutations until UI is interactive
+      InteractionManager.runAfterInteractions(() => {
+        flushOfflineQueue();
+      });
     }
-    setReady(true);
   }, [flushOfflineQueue]);
 
   useEffect(() => {
     boot();
   }, [boot]);
 
-  if (!fontsLoaded || !ready) {
+  if (!fontsLoaded || !ready || !hydrated) {
     return (
       <View
         style={{
@@ -87,7 +78,7 @@ export default function App() {
       >
         <Image
           source={APP_LOGO}
-          style={{ width: 128, height: 128, borderRadius: 24 }}
+          style={{ width: 112, height: 112, borderRadius: 22 }}
           resizeMode="cover"
         />
         <ActivityIndicator color={colors.accent} size="large" />
